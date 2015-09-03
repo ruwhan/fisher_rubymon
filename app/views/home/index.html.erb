@@ -1,0 +1,391 @@
+
+<div class="container">
+  <div class="row">
+    <div class="col-sm-12">
+      <h3>Login</h3>
+      <a href="#" class="btn btn-primary" id="fb_login">Login with Facebook</a>
+      <%# link_to "Sign in with Facebook", api_user_omniauth_authorize_path(:facebook), { id: 'fb_login', class: 'btn btn-primary' } %>
+    </div>
+  </div>
+  <hr />
+  <div class="row main-section">
+    <div class="col-sm-6">
+      <h3>Monster</h3>
+      <form role="form" id="monster_form">
+        <div class="form-group">
+          <input type="text" name="monster[name]" id="monster_name" class="form-control" />
+        </div>
+        <div class="form-group">
+          <input type="number" name="monster[power]" id="monster_power" class="form-control" />
+        </div>
+        <div class="form-group">
+          <select type="text" name="monster[element_type]" id="monster_element_type" class="form-control">
+            <option value="fire">fire</option>
+            <option value="water">water</option>
+            <option value="earth">earth</option>
+            <option value="electric">electric</option>
+            <option value="wind">wind</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <input type="submit" value="Create Monster" class="btn btn-primary" />
+        </div>
+      </form>
+      <ul class="monsters-list"></ul>
+    </div>
+    <div class="col-sm-6">
+      <h3>Team</h3>
+      <form role="form" id="team_form">
+        <div class="form-group">
+          <input type="text" name="team[name]" id="team_name" class="form-control" />
+        </div>
+        <input type="submit" value="Create Team" class="btn btn-primary" />
+      </form>
+      <ul class="teams-list"></ul>
+    </div>
+  </div>
+  <hr />
+  <div class="row">
+    <div class="col-md-12">
+      <!-- <fb:login-button scope="public_profile,email" onlogin="checkLoginState();">
+      </fb:login-button> -->
+
+      <div id="status">
+      </div>
+    </div>
+  </div>
+</div>
+
+<% content_for :javascripts do %>
+  <script type="text/javascript">
+    // This is called with the results from from FB.getLoginStatus().
+    function statusChangeCallback(response) {
+      console.log('statusChangeCallback');
+      console.log(response);
+      // The response object is returned with a status field that lets the
+      // app know the current login status of the person.
+      // Full docs on the response object can be found in the documentation
+      // for FB.getLoginStatus().
+      if (response.status === 'connected') {
+        // Logged into your app and Facebook.
+        // testAPI();
+        if (getCookie("auth_token") === "") {
+          getFbMe();
+        }
+        else {
+          getMonstersList().done(refreshMonsters);
+          getTeamsList().done(refreshTeams);
+        }
+        $('#fb_login').hide();
+      } else if (response.status === 'not_authorized') {
+        // The person is logged into Facebook, but not your app.
+        document.getElementById('status').innerHTML = 'Please log ' +
+          'into this app.';
+          $('#fb_login').show();
+      } else {
+        // The person is not logged into Facebook, so we're not sure if
+        // they are logged into this app or not.
+        document.getElementById('status').innerHTML = 'Please log ' +
+          'into Facebook.';
+        $('#fb_login').show();
+      }
+    }
+
+    // This function is called when someone finishes with the Login
+    // Button.  See the onlogin handler attached to it in the sample
+    // code below.
+    function checkLoginState() {
+      FB.getLoginStatus(function(response) {
+        statusChangeCallback(response);
+      });
+    }
+
+    function fbLogin() {
+      FB.login(function(res) {
+        statusChangeCallback(res);
+      }, { scope: 'email', auth_type: 'rerequest' });
+    }
+
+    var getFbMe = function() {
+      FB.api('/me', function(response) {
+        console.log('Successful login for: ' + response.name);
+        document.getElementById('status').innerHTML =
+          'Thanks for logging in, ' + response.name + '!';
+        
+        var response_copy = response;
+        response_copy['uid'] = response.id;
+        delete response_copy['id'];
+        var jqXhr = $.ajax({
+          url: '<%= create_from_facebook_api_sessions_path %>',
+          method: 'POST',
+          data: {
+            facebook: response_copy
+          },
+          // contentType: 'application/json'
+        });
+
+        jqXhr.done(function(res) {
+          setCookie('auth_token', res.user.auth_token, 14);
+          location.reload();
+        });
+      });
+    };
+
+    window.fbAsyncInit = function() {
+      FB.init({
+        appId      : '',    // Fill your appId here
+        cookie     : true,  // enable cookies to allow the server to access 
+                            // the session
+        xfbml      : true,  // parse social plugins on this page
+        version    : 'v2.2' // use version 2.2
+      });
+
+      // Now that we've initialized the JavaScript SDK, we call 
+      // FB.getLoginStatus().  This function gets the state of the
+      // person visiting this page and can return one of three states to
+      // the callback you provide.  They can be:
+      //
+      // 1. Logged into your app ('connected')
+      // 2. Logged into Facebook, but not your app ('not_authorized')
+      // 3. Not logged into Facebook and can't tell if they are logged into
+      //    your app or not.
+      //
+      // These three cases are handled in the callback function.
+
+      FB.getLoginStatus(function(response) {
+        statusChangeCallback(response);
+      });
+    };
+
+    // Load the SDK asynchronously
+    (function(d, s, id) {
+      var js, fjs = d.getElementsByTagName(s)[0];
+      if (d.getElementById(id)) return;
+      js = d.createElement(s); js.id = id;
+      js.src = "//connect.facebook.net/en_US/sdk.js";
+      fjs.parentNode.insertBefore(js, fjs);
+    }(document, 'script', 'facebook-jssdk'));
+
+    // Here we run a very simple test of the Graph API after login is
+    // successful.  See statusChangeCallback() for when this call is made.
+    function testAPI() {
+      console.log('Welcome!  Fetching your information.... ');
+      FB.api('/me', function(response) {
+        console.log('Successful login for: ' + response.name);
+        document.getElementById('status').innerHTML =
+          'Thanks for logging in, ' + response.name + '!';
+      });
+    }
+
+    var setCookie = function(cname, cvalue, expiryDays) {
+      var d = new Date();
+      d.setTime(d.getTime() + (expiryDays * 24 * 60 * 60 * 1000));
+      var expires = "expires=" + d.toUTCString();
+      document.cookie = cname + "=" + cvalue + ";" + expires;
+    }
+
+    var getCookie = function(cname) {
+      var name = cname + "=";
+      var contents = document.cookie.split(';');
+      for (var i = 0; i < contents.length; i++) {
+        var c = contents[i];
+        while (c.charAt(0) === ' ') {
+          c = c.substring(1);
+        }
+        
+        if (c.indexOf(name) === 0) {
+          return c.substring(name.length, c.length);
+        }
+
+        return "";
+      };
+    }
+
+    /*
+     * Index scripts
+     */
+
+    /*
+     * Monsters
+     */
+
+    var getMonstersList = function() {
+      return $.ajax({
+        url: '/monsters',
+        type: 'GET',
+        headers: { "Authorization": getCookie('auth_token') }
+      });
+    };
+
+    var getMonster = function(id) {
+      return $.ajax({
+        url: '/monsters/' + id,
+        type: 'GET',
+        headers: { "Authorization": getCookie('auth_token') }
+      });
+    };
+
+    var createMonster = function(monster) {
+      return $.ajax({
+        url: '/monsters',
+        type: 'POST',
+        headers: { "Authorization": getCookie('auth_token') },
+        data: { "monster": monster }
+      });
+    };
+
+    var updateMonster = function(id, monster_attributes) {
+      return $.ajax({
+        url: '/monsters/' + id,
+        type: 'PATCH',
+        headers: { "Authorization": getCookie('auth_token') },
+        data: { "monster": monster_attributes }
+      });
+    };
+
+    var deleteMonster = function(id) {
+      return $.ajax({
+        url: '/monsters/' + id,
+        type: 'DELETE',
+        headers: { "Authorization": getCookie('auth_token') }
+      });
+    };
+
+    var refreshMonsters = function(list) {
+      $('.monsters-list').empty();
+      list.monsters.forEach(function(m) {
+        var monster_team_id = m.team ? m.team.id : 0;
+        $('.monsters-list').append("<li class=\"monster-item\" data-monster_id=\"" + m.id + "\" data-monster_team_id=\"" + monster_team_id + "\">" + m.name + " ( " + m.element_type + ", " + m.power + " )</li>");
+      });
+
+      getTeamsList().done(function(res) {
+        res.teams.forEach(function(t) {
+          $('.monster-item').append("<button class=\"btn btn-default add-to-team\" data-team_id=\"" + t.id + "\">Add to team " + t.name + "</button>");
+        });
+
+        $('.monster-item').append("<button class=\"btn btn-danger remove-monster\">Remove</button>");
+      });
+    };
+
+    /*
+     * Teams
+     */
+
+    var getTeamsList = function() {
+      return $.ajax({
+        url: '/teams',
+        type: 'GET',
+        headers: { "Authorization": getCookie('auth_token') },
+      });
+    };
+
+    var createTeam = function(team) {
+      return $.ajax({
+        url: '/teams',
+        type: 'POST',
+        headers: { "Authorization": getCookie('auth_token') },
+        data: { "team": team }
+      });
+    };
+
+    var updateTeam = function(id, team_attributes) {
+      return $.ajax({
+        url: '/teams/' + id ,
+        type: 'PATCH',
+        headers: { "Authorization": getCookie('auth_token') },
+        data: { "team": team_attributes }
+      });
+    };
+
+    var deleteTeam = function(id) {
+      return $.ajax({
+        url: '/teams/' + id,
+        type: 'DELETE',
+        headers: { "Authorization": getCookie('auth_token') }
+      });
+    };
+
+    var refreshTeams = function(list) {
+      $('.teams-list').empty();
+
+      list.teams.forEach(function(t) {
+        $('.teams-list').append("<li class=\"team-item\" data-team_id=\"" + t.id + "\">" + t.name + " ( " + t.monsters.length + " )</li>");
+      });
+
+      $('.team-item').append("<button class=\"btn btn-danger remove-team\">Remove</button>");
+    };
+
+    /*
+     * Common
+     */
+
+
+    $(document).on('click', '#fb_login', function(e) {
+      e.preventDefault();
+      fbLogin();
+    });
+
+    $(document).on('submit', '#monster_form', function (e) {
+      e.preventDefault();
+
+      createMonster({
+        "name": $('#monster_name').val(),
+        "power": $("#monster_power").val(),
+        "element_type": $("#monster_element_type").val()
+      })
+      .done(function(res) {
+        $('#monster_form')[0].reset();
+        getMonstersList().done(refreshMonsters);
+      });
+    });
+
+    $(document).on('submit', '#team_form', function(e) {
+      e.preventDefault();
+
+      createTeam({
+        "name": $('#team_name').val()
+      })
+      .done(function() {
+        $('#team_form')[0].reset();
+        getTeamsList().done(refreshTeams);
+        getMonstersList().done(refreshMonsters);
+      });
+    });
+
+    $(document).on('click', '.add-to-team', function(e) {
+      e.preventDefault();
+      var monster_id = $(e.target).parent().data('monster_id');
+      var monster_team_id = $(e.target).parent().data('monster_team_id');
+      var team_id = $(e.target).data('team_id');
+
+      if (monster_team_id !== team_id) {
+        updateMonster(monster_id, { "team_id": team_id }).done(function() {
+          getMonstersList().done(refreshMonsters);
+          getTeamsList().done(refreshTeams);
+        }); 
+      } 
+    });
+
+    $(document).on('click', '.remove-monster', function(e) {
+      e.preventDefault();
+      var monster_id = $(e.target).parent().data('monster_id');
+      // var team_id = $(e.target).data('team_id');
+
+      deleteMonster(monster_id).done(function() {
+        getMonstersList().done(refreshMonsters);
+        getTeamsList().done(refreshTeams);
+      }); 
+    });
+
+    $(document).on('click', '.remove-team', function(e) {
+      e.preventDefault();
+      var team_id = $(e.target).parent().data('team_id');
+      // var team_id = $(e.target).data('team_id');
+
+      deleteTeam(team_id).done(function() {
+        getMonstersList().done(refreshMonsters);
+        getTeamsList().done(refreshTeams);
+      }); 
+    });    
+  </script>
+<% end %>
